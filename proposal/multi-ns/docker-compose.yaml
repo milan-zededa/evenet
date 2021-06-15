@@ -1,0 +1,116 @@
+version: '3.3'
+
+services:
+
+  # Gateway
+  # -------
+  gw:
+    container_name: gw
+    image: "evenet/vswitch"
+    privileged: true
+    pid: "host"
+    dns:
+      - 8.8.8.8
+    volumes:
+      - ./scripts:/scripts
+
+  # Zedbox
+  # ------
+  zedbox:
+    container_name: zedbox
+    image: "evenet/vswitch"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    dns:
+      - 8.8.8.8
+    volumes:
+      - ./scripts:/scripts
+
+  # Network Instances
+  # -----------------
+  ni1:
+    container_name: ni1
+    image: "evenet/vswitch"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    dns:
+      - 8.8.8.8
+    volumes:
+      - ./scripts:/scripts
+
+  ni2:
+    container_name: ni2
+    image: "evenet/vswitch"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    dns:
+      - 8.8.8.8
+    volumes:
+      - ./scripts:/scripts
+
+  ni3:
+    container_name: ni3
+    image: "evenet/vswitch"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    dns:
+      - 8.8.8.8
+    volumes:
+      - ./scripts:/scripts
+
+  ni4:
+    container_name: ni4
+    image: "evenet/vswitch"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    dns:
+      - 8.8.8.8
+    volumes:
+      - ./scripts:/scripts
+
+  # Applications
+  # ------------
+  app1:
+    container_name: app1
+    image: "evenet/app"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    volumes:
+      - ./scripts:/scripts
+    command: /scripts/http.sh app1 80
+
+  app2:
+    container_name: app2
+    image: "evenet/app"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    volumes:
+      - ./scripts:/scripts
+    command: /scripts/http.sh app2 80
+
+  app3:
+    container_name: app3
+    image: "evenet/app"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    volumes:
+      - ./scripts:/scripts
+    command: sleep infinity
+
+  app4:
+    container_name: app4
+    image: "evenet/app"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    volumes:
+      - ./scripts:/scripts
+    command: sleep infinity
