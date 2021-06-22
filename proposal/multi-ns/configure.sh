@@ -3,8 +3,8 @@
 set -x
 
 # Network subnet which should not collide with anything.
-# 127.0.0.0/8 is routed by the local table - not sure if we can safely change it.
-veth_net_prefix=1.1.1
+# Also experimented with 127.0.0.0/8 and 0.0.0.0/8 but it didn't work and behave very strangely.
+veth_net_prefix=169.254.100
 
 # Add link to a given container network namespace under /var/run/netns of another container.
 # expose_container_netns <container-to-expose> <container-where-the-link-is-added>

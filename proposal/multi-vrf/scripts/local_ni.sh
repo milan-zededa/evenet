@@ -6,7 +6,7 @@ set -x
 # It is used to configure everything for a local network instance except for ACLs
 # (VRF netdev, bridge, dnsmasq, http server)
 #
-# Usage: local_ni.sh <ni-index> <ni-subnet> <bridge-ipnet> <dhcp-range> <uplink-interface>
+# Usage: local_ni.sh <ni-index> <ni-subnet> <bridge-ipnet> <dhcp-range> <zedbox-veth-ipnet> <ni-veth-ipnet> <uplink-interface>
 
 function cut_mask() {
   echo ${1} | cut -d'/' -f1
@@ -17,37 +17,65 @@ ni_subnet=${2}
 bridge_ipnet=${3}
 bridge_ip=$(cut_mask ${bridge_ipnet})
 dhcp_range=${4}
-uplink=${5}
-
+zedbox_veth_ipnet=${5}
+zedbox_veth_ip=$(cut_mask ${zedbox_veth_ipnet})
+ni_veth_ipnet=${6}
+ni_veth_ip=$(cut_mask ${ni_veth_ipnet})
+uplink=${7}
 
 vrf_name="vrf${ni_index}"
 br_name="br${ni_index}"
-ni_table=$((500+ni_index))
+vrf_table=$((400+ni_index))
+
+ni_veth="veth${ni_index}.1"
+ni_veth_hwaddr="AA:AA:AA:AA:0${ni_index}:01"
+zedbox_veth="veth${ni_index}"
+zedbox_veth_hwaddr="AA:AA:AA:AA:0${ni_index}:00"
 
 # 1. VRF device
-ip link add ${vrf_name} type vrf table ${ni_table}
+ip link add ${vrf_name} type vrf table ${vrf_table}
 ip link set dev ${vrf_name} up
 
-# 2. bridge
+# 2. zedbox<->VRF veth
+#    - https://stbuehler.de/blog/article/2020/02/29/using_vrf__virtual_routing_and_forwarding__on_linux.html
+#    - static ARP are needed here, broadcast does not work well if both veth ends are in the same namespace
+ip link add name ${ni_veth} type veth peer name ${zedbox_veth}
+ip link set dev ${ni_veth} master ${vrf_name}
+ip link set dev ${ni_veth} address ${ni_veth_hwaddr}
+ip link set dev ${zedbox_veth} address ${zedbox_veth_hwaddr}
+ip link set ${ni_veth} up
+ip addr add ${ni_veth_ipnet} dev ${ni_veth}
+ip link set ${zedbox_veth} up
+ip addr add ${zedbox_veth_ipnet} dev ${zedbox_veth}
+arp -i ${zedbox_veth} -s ${ni_veth_ip} ${ni_veth_hwaddr}
+arp -i ${ni_veth} -s ${zedbox_veth_ip} ${zedbox_veth_hwaddr}
+
+# 3. bridge
 ip link add name ${br_name} type bridge
 ip link set dev ${br_name} master ${vrf_name}
 ip link set dev ${br_name} up
 ip addr add ${bridge_ipnet} dev ${br_name}
 
-# 3. track connection for this NI separately
+# 4. track connection for this NI separately
 #    - https://lwn.net/Articles/370152/
-#    - TODO: seems with zone=0 iptables do not work well with VRFs
-#              tcp      6 298 ESTABLISHED src=10.10.1.103 dst=169.254.169.254 sport=53682 dport=80 src=10.10.1.1 dst=10.10.1.103 sport=80 dport=53682 [ASSURED] mark=0 use=1
-#                vs.
-#              tcp      6 110 TIME_WAIT src=10.10.1.124 dst=169.254.169.254 sport=46142 dport=80 src=10.10.1.1 dst=10.10.1.124 sport=80 dport=46142 [ASSURED] mark=0 zone=1 use=1
-iptables -t raw -A PREROUTING -i ${br_name} -j CT --zone 1 #${ni_index}
-iptables -t raw -A OUTPUT -o ${br_name} -j CT --zone 1 #${ni_index}
-iptables -t raw -A PREROUTING -i ${uplink} -j CT --zone 1
+iptables -t raw -A PREROUTING -i ${ni_veth} -j CT --zone ${ni_index}
+iptables -t raw -A OUTPUT -o ${ni_veth} -j CT --zone ${ni_index}
+iptables -t raw -A PREROUTING -i ${br_name} -j CT --zone ${ni_index}
+iptables -t raw -A OUTPUT -o ${br_name} -j CT --zone ${ni_index}
 
-# 4. configure MASQUERADE on the uplink interface
-iptables -t nat -A POSTROUTING -o ${uplink} -s ${ni_subnet} -j MASQUERADE
+iptables -t raw -A PREROUTING -i ${zedbox_veth} -j CT --zone 999
+iptables -t raw -A OUTPUT -o ${zedbox_veth} -j CT --zone 999
+iptables -t raw -A PREROUTING -i ${uplink} -j CT --zone 999
+iptables -t raw -A OUTPUT -o ${uplink} -j CT --zone 999
 
-# 5. dnsmasq (also added here github.com ipset which is referenced in acl.sh)
+# 5. configure MASQUERADE on both the ni-veth and the uplink interface
+iptables -t nat -A POSTROUTING -o ${ni_veth} -s ${ni_subnet} -j MASQUERADE
+iptables -t nat -A POSTROUTING -o ${uplink} -s ${ni_veth_ip}/32 -j MASQUERADE
+
+# 6. also SNAT ingress traffic with colliding source IP
+iptables -t nat -A POSTROUTING -o ${zedbox_veth} -s ${ni_subnet} -j SNAT --to ${zedbox_veth_ip}
+
+# 7. dnsmasq (also added here github.com ipset which is referenced in acl.sh)
 cat <<EOF > /etc/dnsmasq-${br_name}.conf
 except-interface=lo
 bind-interfaces
@@ -81,7 +109,7 @@ stderr_logfile=/dev/fd/2
 stderr_logfile_maxbytes=0
 EOF
 
-# 6. http server
+# 8. http server
 cat <<EOF > /etc/supervisor.d/http-${br_name}.conf
 [program:http-${br_name}]
 command=/scripts/http.sh ni${ni_index}-cloud-init 80 ${bridge_ip} ${vrf_name}

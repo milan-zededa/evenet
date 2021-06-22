@@ -15,8 +15,8 @@ function configure_blackhole() {
   ip netns exec ${ns} ip link add name ${dummy} type dummy
   ip netns exec ${ns} ip link set dev ${dummy} up
   ip netns exec ${ns} ip link set dev ${dummy} arp off
-  ip netns exec ${ns} ip rule add priority 1000 fwmark 0xffffff/0xffffff lookup 500
-  ip netns exec ${ns} ip route add table 500 default dev ${dummy}
+  ip netns exec ${ns} ip rule add priority 1000 fwmark 0xffffff/0xffffff lookup 100
+  ip netns exec ${ns} ip route add table 100 default dev ${dummy}
 }
 
 # Chain created to mark and accept flows matched by an ACCEPT ACE.
@@ -165,37 +165,45 @@ ip netns exec ni3 iptables -A PREROUTING -t mangle -i br -m physdev --physdev-in
 
 # App4 ACLs
 # ---------
-# - (switch) N4 - ingress direction: allow ingress DNS, BOOTP, cloud-init HTTP
+# - (switch) NI4 - ingress direction: allow ingress DNS, BOOTP, cloud-init HTTP
 ip netns exec ni4 iptables -A FORWARD -t filter -o eth2 -m physdev --physdev-out nbu1x4+ -p udp -m multiport --sports bootps,domain -j ACCEPT
 ip netns exec ni4 iptables -A FORWARD -t filter -o eth2 -m physdev --physdev-out nbu1x4+ -p tcp --sport domain -j ACCEPT
-# - (switch) N4 - ingress direction: allow 192.168.0.0/16 but limit to 5/s, bursts of 15
+# - (switch) NI4 - ingress direction: allow 192.168.0.0/16 but limit to 5/s, bursts of 15
 #     - TODO: this one is weird, why not to use --physdev-out?
 ip netns exec ni4 iptables -A FORWARD -t filter -i eth2 -o eth2 -s 192.168.0.0/16 -m limit --limit 5/sec --limit-burst 15 -j ACCEPT
-# - (switch) N4 - ingress direction: block the rest
+# - (switch) NI4 - ingress direction: block the rest
 ip netns exec ni4 iptables -A FORWARD -t filter -o eth2 -m physdev --physdev-out nbu1x4+ -j DROP
 
-# - (switch) N4 - egress direction: allow ingress DNS, BOOTP, cloud-init HTTP
+# - (switch) NI4 - egress direction: allow ingress DNS, BOOTP, cloud-init HTTP
 ip netns exec ni4 iptables -A PREROUTING -t raw -i eth2 -m physdev --physdev-in nbu1x4+ -p udp -m multiport --dports bootps,domain -j ACCEPT
 ip netns exec ni4 iptables -A PREROUTING -t raw -i eth2 -m physdev --physdev-in nbu1x4+ -p tcp --dport domain -j ACCEPT
-# - (switch) N4 - egress direction: allow 192.168.0.0/16 but limit to 5/s, bursts of 15
+# - (switch) NI4 - egress direction: allow 192.168.0.0/16 but limit to 5/s, bursts of 15
 ip netns exec ni4 iptables -A PREROUTING -t raw -i eth2 -m physdev --physdev-in nbu1x4+ -d 192.168.0.0/16 -m limit --limit 5/sec --limit-burst 15 -j ACCEPT
-# - (switch) N4 - egress direction: block the rest
+# - (switch) NI4 - egress direction: block the rest
 ip netns exec ni4 iptables -A PREROUTING -t raw -i eth2 -m physdev --physdev-in nbu1x4+ -j DROP
 
-# - (switch) N4 - mark DNS, BOOTP, cloud-init HTTP
+# - (switch) NI4 - mark DNS, BOOTP, cloud-init HTTP
 configure_mark_and_accept_chain ni4 proto-eth2-nbu1x4-6 0x6
 ip netns exec ni4 iptables -A PREROUTING -t mangle -i eth2 -m physdev --physdev-in nbu1x4+ -d 192.168.2.1 -p udp -m multiport --dports bootps,domain -j proto-eth2-nbu1x4-6
 configure_mark_and_accept_chain ni4 proto-eth2-nbu1x4-7 0x7
 ip netns exec ni4 iptables -A PREROUTING -t mangle -i eth2 -m physdev --physdev-in nbu1x4+ -d 192.168.2.1 -p tcp --dport domain -j proto-eth2-nbu1x4-7
 configure_mark_and_accept_chain ni4 proto-eth2-nbu1x4-8 0x8
 ip netns exec ni4 iptables -A PREROUTING -t mangle -i eth2 -m physdev --physdev-in nbu1x4+ -d 169.254.169.254 -p tcp --dport http -j proto-eth2-nbu1x4-8
-# - (switch) N4 - mark dst=192.168.0.0/16 (ACE) in both directions
+# - (switch) NI4 - mark dst=192.168.0.0/16 (ACE) in both directions
 configure_mark_and_accept_chain ni4 eth2-nbu1x4-1 0x4000001
 ip netns exec ni4 iptables -A PREROUTING -t mangle -i eth2 -m physdev --physdev-in nbu1x4+ -d 192.168.0.0/16 -j eth2-nbu1x4-1
 # TODO: why not to use --physdev-out?
 ip netns exec ni4 iptables -A PREROUTING -t mangle -i eth2 -s 192.168.0.0/16 -j eth2-nbu1x4-1
 # Note: dropped flows are not marked for switch networks
 
+
+# Allow EVE to initiate communication with apps.
+configure_mark_and_accept_chain ni1 eve-veth1 0xa
+ip netns exec ni1 iptables -A PREROUTING -t mangle -i veth1.1 -s ${veth_net_prefix}.1 -j eve-veth1
+configure_mark_and_accept_chain ni2 eve-veth2 0xa
+ip netns exec ni2 iptables -A PREROUTING -t mangle -i veth2.1 -s ${veth_net_prefix}.5 -j eve-veth2
+configure_mark_and_accept_chain ni3 eve-veth3 0xa
+ip netns exec ni3 iptables -A PREROUTING -t mangle -i veth3.1 -s ${veth_net_prefix}.9 -j eve-veth3
 
 # Remaining common rules.
 for ns in ni1 ni2 ni3 ni4; do

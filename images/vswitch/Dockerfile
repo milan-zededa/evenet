@@ -32,7 +32,6 @@ RUN mkdir /etc/supervisor.d
 COPY supervisor.conf /etc/supervisor.conf
 
 # https://gist.github.com/markusfisch/51b1ce6c3ca9ce67e081
-RUN wget https://gist.githubusercontent.com/markusfisch/51b1ce6c3ca9ce67e081/raw/57c51da2c33090e13e2800ce1d30eec91720d7af/setnif.sh -O /usr/bin/setnif.sh
-RUN chmod u+x /usr/bin/setnif.sh
+COPY setnif.sh /usr/bin/setnif.sh
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor.conf"]
