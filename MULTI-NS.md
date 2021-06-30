@@ -170,16 +170,136 @@ conntrack v1.4.5 (conntrack-tools): 2 flow entries have been shown.
 
 ```
 
-Try to hairpin from `app4` to `app2` via portmap outside the edge device (verify with `docker exec -it gw tcpdump -i any -n`):
+Try to establish IPsec tunnel between `NI4` and `cloud1`:
+```
+$ docker exec ni4 swanctl --initiate --child gw
+[IKE] initiating IKE_SA gw[1] to 192.168.111.1
+[ENC] generating IKE_SA_INIT request 0 [ SA KE No N(NATD_S_IP) N(NATD_D_IP) N(FRAG_SUP) N(HASH_ALG) N(REDIR_SUP) ]
+[NET] sending packet: from 169.254.100.14[500] to 192.168.111.1[500] (464 bytes)
+[NET] received packet: from 192.168.111.1[500] to 169.254.100.14[500] (472 bytes)
+[ENC] parsed IKE_SA_INIT response 0 [ SA KE No N(NATD_S_IP) N(NATD_D_IP) N(FRAG_SUP) N(HASH_ALG) N(CHDLESS_SUP) N(MULT_AUTH) ]
+[CFG] selected proposal: IKE:AES_CBC_256/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_2048
+[IKE] local host is behind NAT, sending keep alives
+[CFG] no IDi configured, fall back on IP address
+[IKE] authentication of '169.254.100.14' (myself) with pre-shared key
+[IKE] establishing CHILD_SA gw{1}
+[ENC] generating IKE_AUTH request 1 [ IDi AUTH SA TSi TSr N(MULT_AUTH) N(EAP_ONLY) N(MSG_ID_SYN_SUP) ]
+[NET] sending packet: from 169.254.100.14[4500] to 192.168.111.1[4500] (220 bytes)
+[NET] received packet: from 192.168.111.1[4500] to 169.254.100.14[4500] (204 bytes)
+[ENC] parsed IKE_AUTH response 1 [ IDr AUTH SA TSi TSr ]
+[IKE] authentication of '192.168.111.1' with pre-shared key successful
+[IKE] IKE_SA gw[1] established between 169.254.100.14[169.254.100.14]...192.168.111.1[192.168.111.1]
+[IKE] scheduling rekeying in 13693s
+[IKE] maximum IKE_SA lifetime 15133s
+[CFG] selected proposal: ESP:AES_CBC_128/HMAC_SHA1_96/NO_EXT_SEQ
+[IKE] CHILD_SA gw{1} established with SPIs c6984117_i c4f8367b_o and TS 10.10.10.0/24 === 192.168.0.0/24
+initiate completed successfully
+
+$ docker exec ni4 swanctl --list-sas
+gw: #1, ESTABLISHED, IKEv2, aa4bf5fe3fcc67f5_i* 0b0a928ac0be54fc_r
+  local  '169.254.100.14' @ 169.254.100.14[4500]
+  remote '192.168.111.1' @ 192.168.111.1[4500]
+  AES_CBC-256/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_2048
+  established 21s ago, rekeying in 13672s
+  gw: #1, reqid 1, INSTALLED, TUNNEL-in-UDP, ESP:AES_CBC-128/HMAC_SHA1_96
+    installed 21s ago, rekeying in 3247s, expires in 3939s
+    in  c6984117,      0 bytes,     0 packets
+    out c4f8367b,      0 bytes,     0 packets
+    local  10.10.10.0/24
+    remote 192.168.0.0/24
+
+$ docker exec cloud1 swanctl --list-sas
+gw: #1, ESTABLISHED, IKEv2, aa4bf5fe3fcc67f5_i 0b0a928ac0be54fc_r*
+  local  '192.168.111.1' @ 192.168.111.1[4500]
+  remote '169.254.100.14' @ 192.168.1.2[4500]
+  AES_CBC-256/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_2048
+  established 43s ago, rekeying in 12978s
+  gw: #1, reqid 1, INSTALLED, TUNNEL-in-UDP, ESP:AES_CBC-128/HMAC_SHA1_96
+    installed 43s ago, rekeying in 3310s, expires in 3917s
+    in  c4f8367b,      0 bytes,     0 packets
+    out c6984117,      0 bytes,     0 packets
+    local  192.168.0.0/24
+    remote 10.10.10.0/24
+```
+
+Try to access HTTP server in `cloud1` from `app4`:
 ```
 $ docker exec -it app4 bash
-root@8d44d3df421:/# curl 192.168.0.2:8080
+root@5a911b8522cc:/# curl 192.168.0.1:80; echo $?
+cloud1-data=...
+0
+```
+
+Try to establish IPsec tunnel between `NI5` and `cloud2`:
+```
+$ docker exec ni5 swanctl --initiate --child gw
+[IKE] initiating IKE_SA gw[1] to 192.168.222.1
+[ENC] generating IKE_SA_INIT request 0 [ SA KE No N(NATD_S_IP) N(NATD_D_IP) N(FRAG_SUP) N(HASH_ALG) N(REDIR_SUP) ]
+[NET] sending packet: from 169.254.100.18[500] to 192.168.222.1[500] (464 bytes)
+[NET] received packet: from 192.168.222.1[500] to 169.254.100.18[500] (472 bytes)
+[ENC] parsed IKE_SA_INIT response 0 [ SA KE No N(NATD_S_IP) N(NATD_D_IP) N(FRAG_SUP) N(HASH_ALG) N(CHDLESS_SUP) N(MULT_AUTH) ]
+[CFG] selected proposal: IKE:AES_CBC_256/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_2048
+[IKE] local host is behind NAT, sending keep alives
+[CFG] no IDi configured, fall back on IP address
+[IKE] authentication of '169.254.100.18' (myself) with pre-shared key
+[IKE] establishing CHILD_SA gw{1}
+[ENC] generating IKE_AUTH request 1 [ IDi AUTH SA TSi TSr N(MULT_AUTH) N(EAP_ONLY) N(MSG_ID_SYN_SUP) ]
+[NET] sending packet: from 169.254.100.18[4500] to 192.168.222.1[4500] (220 bytes)
+[NET] received packet: from 192.168.222.1[4500] to 169.254.100.18[4500] (204 bytes)
+[ENC] parsed IKE_AUTH response 1 [ IDr AUTH SA TSi TSr ]
+[IKE] authentication of '192.168.222.1' with pre-shared key successful
+[IKE] IKE_SA gw[1] established between 169.254.100.18[169.254.100.18]...192.168.222.1[192.168.222.1]
+[IKE] scheduling rekeying in 13732s
+[IKE] maximum IKE_SA lifetime 15172s
+[CFG] selected proposal: ESP:AES_CBC_128/HMAC_SHA1_96/NO_EXT_SEQ
+[IKE] CHILD_SA gw{1} established with SPIs c2130ee3_i cb5c6b54_o and TS 10.10.10.0/24 === 192.168.0.0/24
+initiate completed successfully
+
+$ docker exec ni5 swanctl --list-sas
+gw: #1, ESTABLISHED, IKEv2, e54f2c8d32b1989e_i* 99e312bcc946ca25_r
+  local  '169.254.100.18' @ 169.254.100.18[4500]
+  remote '192.168.222.1' @ 192.168.222.1[4500]
+  AES_CBC-256/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_2048
+  established 20s ago, rekeying in 13712s
+  gw: #1, reqid 1, INSTALLED, TUNNEL-in-UDP, ESP:AES_CBC-128/HMAC_SHA1_96
+    installed 20s ago, rekeying in 3313s, expires in 3940s
+    in  c2130ee3,      0 bytes,     0 packets
+    out cb5c6b54,      0 bytes,     0 packets
+    local  10.10.10.0/24
+    remote 192.168.0.0/24
+
+$ docker exec cloud2 swanctl --list-sas
+gw: #1, ESTABLISHED, IKEv2, e54f2c8d32b1989e_i 99e312bcc946ca25_r*
+  local  '192.168.222.1' @ 192.168.222.1[4500]
+  remote '169.254.100.18' @ 192.168.2.2[4500]
+  AES_CBC-256/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_2048
+  established 38s ago, rekeying in 12966s
+  gw: #1, reqid 1, INSTALLED, TUNNEL-in-UDP, ESP:AES_CBC-128/HMAC_SHA1_96
+    installed 38s ago, rekeying in 3324s, expires in 3922s
+    in  cb5c6b54,      0 bytes,     0 packets
+    out c2130ee3,      0 bytes,     0 packets
+    local  192.168.0.0/24
+    remote 10.10.10.0/24
+```
+
+Try to access HTTP server in `cloud2` from `app5`:
+```
+$ docker exec -it app5 bash
+root@5a911b8522cc:/# curl 192.168.0.1:80; echo $?
+cloud2-data=...
+0
+```
+
+Try to hairpin from `app6` to `app2` via portmap outside the edge device (verify with `docker exec -it gw tcpdump -i any -n`):
+```
+$ docker exec -it app6 bash
+root@6ba02e9464c0:/# curl 192.168.0.2:8080
 (WORKS AND IT IS LIMITED IN BANDWIDTH)
 ```
 
-Try any remote destination from `app4`. Should be blocked and leave no conntracks:
+Try any remote destination from `app6`. Should be blocked and leave no conntracks:
 ```
-$ docker exec -it app4 bash
+$ docker exec -it app6 bash
 root@6ba02e9464c0:/# curl --connect-timeout 3 --retry 3  google.com
 curl: (28) Connection timed out after 3000 milliseconds
 Warning: Transient problem: timeout Will retry in 1 seconds. 3 retries left.
@@ -194,7 +314,7 @@ Try to connect from `zedbox` to `app1` (i.e. the case of EVE initiating connecti
 ```
 $ docker exec -it zedbox bash
 root@8d44d3df421:/# curl --interface veth1 10.10.1.102:80
-...
+app1-data=...
 ```
 Note that IP address assigned to `app1` may be different for your deployment - get IP with `docker exec app1 ifconfig nbu1x1.1`.\
 **TODO**: DNS service for the zedbox namespace with app host entries?

@@ -3,10 +3,10 @@
 set -x
 
 # This script is run from the zedbox container.
-# It is used to configure everything for a local network instance except for ACLs
+# It is used to configure everything for a local/vpn network instance except for ACLs
 # (VRF netdev, bridge, dnsmasq, http server)
 #
-# Usage: local_ni.sh <ni-index> <ni-subnet> <bridge-ipnet> <dhcp-range> <zedbox-veth-ipnet> <ni-veth-ipnet> <uplink-interface>
+# Usage: ni.sh <ni-index> <ni-subnet> <bridge-ipnet> <dhcp-range> <zedbox-veth-ipnet> <ni-veth-ipnet> <uplink-interface>
 
 function cut_mask() {
   echo ${1} | cut -d'/' -f1
@@ -49,6 +49,13 @@ ip link set ${zedbox_veth} up
 ip addr add ${zedbox_veth_ipnet} dev ${zedbox_veth}
 arp -i ${zedbox_veth} -s ${ni_veth_ip} ${ni_veth_hwaddr}
 arp -i ${ni_veth} -s ${zedbox_veth_ip} ${zedbox_veth_hwaddr}
+# In the VPN network, XFRM device will encrypt a packet and send it through a VETH in the egress direction.
+# However, strongSwan listens on the uplink-side of the VETH and the IP address of that side will be therefore
+# used as a source IP. Once the packet crosses the VETH and gets routed for the second time (zone 999) it will
+# be therefore perceived as a locally originating packet and yet being forwarded instead. We have to explicitly
+# allow this case, otherwise the packet will get dropped.
+echo 1 >/proc/sys/net/ipv4/conf/${zedbox_veth}/accept_local
+echo 1 >/proc/sys/net/ipv4/conf/${ni_veth}/accept_local
 
 # 3. bridge
 ip link add name ${br_name} type bridge
@@ -70,7 +77,7 @@ iptables -t raw -A OUTPUT -o ${uplink} -j CT --zone 999
 
 # 5. configure MASQUERADE on both the ni-veth and the uplink interface
 iptables -t nat -A POSTROUTING -o ${ni_veth} -s ${ni_subnet} -j MASQUERADE
-iptables -t nat -A POSTROUTING -o ${uplink} -s ${ni_veth_ip}/32 -j MASQUERADE
+iptables -t nat -A POSTROUTING -o ${uplink} -s ${ni_veth_ip},${zedbox_veth_ip} -j MASQUERADE
 
 # 6. also SNAT ingress traffic with colliding source IP
 iptables -t nat -A POSTROUTING -o ${zedbox_veth} -s ${ni_subnet} -j SNAT --to ${zedbox_veth_ip}
@@ -112,7 +119,7 @@ EOF
 # 8. http server
 cat <<EOF > /etc/supervisor.d/http-${br_name}.conf
 [program:http-${br_name}]
-command=/scripts/http.sh ni${ni_index}-cloud-init 80 ${bridge_ip} ${vrf_name}
+command=bash -x /scripts/http.sh ni${ni_index}-cloud-init 80 ${bridge_ip} ${vrf_name}
 stdout_logfile=/dev/fd/1
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/fd/2

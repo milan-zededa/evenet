@@ -10,7 +10,8 @@ interface=${4:-}
 
 mkdir -p /www
 echo "${srv_name}-data=" > /www/rand-${srv_name}.data
-base64 /dev/urandom | head -c 10000000 >> /www/rand-${srv_name}.data
+dd bs=1024 count=10240 < /dev/urandom > /www/urand-${srv_name}.data
+base64 /www/urand-${srv_name}.data >> /www/rand-${srv_name}.data
 echo -ne "HTTP/1.0 200 OK\r\nContent-Length: $(wc -c </www/rand-${srv_name}.data)\r\n\r\n" > /www/index-${srv_name}.html
 cat /www/rand-${srv_name}.data >> /www/index-${srv_name}.html
 

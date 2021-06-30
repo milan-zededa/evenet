@@ -5,38 +5,46 @@ set -x
 # This script is run from the zedbox container.
 # It is used to configure policy-based routing for a network instance inside the zedbox network namespace.
 #
-# Usage: pbr.sh <ni-index> <uplink-index> <veth-subnet> <uplink-subnet> <zedbox-veth-ip> <ni-veth-ip> <veth-broadcast> <uplink-ip> <uplink-broadcast> <gw-ip>
+# Usage: pbr.sh <ni-index> <ni-type> <uplink-index> <veth-subnet> <uplink-subnet> <zedbox-veth-ip> <ni-veth-ip> <veth-broadcast> <uplink-ip> <uplink-broadcast> <gw-ip>
 
 ni_index=${1}
 ni_veth="veth${ni_index}.1"
 zedbox_veth="veth${ni_index}"
+ni_type=${2}
 
-uplink_index=${2}
+uplink_index=${3}
 uplink="eth${uplink_index}"
 
-veth_subnet=${3}
-uplink_subnet=${4}
+veth_subnet=${4}
+uplink_subnet=${5}
 
-zedbox_veth_ip=${5}
-ni_veth_ip=${6}
-veth_broadcast=${7}
-uplink_ip=${8}
-uplink_broadcast=${9}
-gw_ip=${10}
+zedbox_veth_ip=${6}
+ni_veth_ip=${7}
+veth_broadcast=${8}
+uplink_ip=${9}
+uplink_broadcast=${10}
+gw_ip=${11}
 
 
 # Routing:
-#  app -> <ni-namespace-main-table> -> VETH+SNAT -> <uplink-table> -> external
+#  app -> <ni-namespace-main-table> -> VETH+SNAT -> <uplink-table> -> SNAT -> external
 #
-#  external -> <uplink-table> -> VETH+DNAT -> <ni-namespace-main-table> -> app
+#  external -> DNAT -> <local-table> -> VETH+DNAT -> <ni-namespace-main-table> -> app
 #
-#  EVE -> <eve-table> -> VETH -> <ni-namespace-main-table> -> app -> <ni-namespace-main-table> -> VETH -> <eve-table> -> EVE
+#  EVE -> <eve-table> -> VETH -> <ni-namespace-main-table> -> app -> <ni-namespace-main-table> -> VETH -> <uplink-table> -> EVE
 
 
 # Destinations available to all network instances using the given uplink interface.
 # It includes the uplink interface, but not any other mgmt interface. Traffic destined to non-uplink mgmt
 # interfaces should leave the box.
-uplink_table=$((500+uplink_index))
+if [ "$ni_type" = "local" ]; then
+  # Share table between local NIs with the same uplink interface
+  uplink_table=$((500+uplink_index))
+else
+  # VPN (PBR not used for switch NI)
+  # Isolate VPN network from other NIs.
+  uplink_table=$((550+ni_index))
+fi
 
 # Table used by EVE to talk to apps in this NI.
 eve_table=$((600+ni_index))
@@ -63,7 +71,6 @@ ip rule del from all lookup local
 ip rule add priority ${pbr_orig_local_prio} from all lookup local
 # - uplink table
 ip rule add priority ${pbr_uplink_table_prio} iif ${zedbox_veth} lookup ${uplink_table}
-ip rule add priority ${pbr_uplink_table_prio} iif ${uplink} lookup ${uplink_table}
 # - eve table
 ip rule add priority ${pbr_eve_table_prio} from ${zedbox_veth_ip}/32 lookup ${eve_table}
 ip rule add priority ${pbr_eve_table_prio} oif ${zedbox_veth} lookup ${eve_table}

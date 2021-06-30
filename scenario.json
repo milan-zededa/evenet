@@ -67,6 +67,10 @@
                 {
                   "type": "fport",
                   "value": "80"
+                },
+                {
+                  "type": "protocol",
+                  "value": "tcp"
                 }
               ],
               "id": 1
@@ -120,6 +124,10 @@
                 {
                   "type": "fport",
                   "value": "80"
+                },
+                {
+                  "type": "protocol",
+                  "value": "tcp"
                 }
               ],
               "id": 1
@@ -205,10 +213,118 @@
     },
     {
       "uuidandversion": {
-        "uuid": "4674039e-7b90-4a8f-8b92-f62921ab3faf",
+        "uuid": "3563028d-6a80-397e-7a81-e518109a2e9e",
         "version": "1"
       },
       "displayname": "app4",
+      "fixedresources": {
+        "memory": 512000,
+        "maxmem": 512000,
+        "vcpus": 1,
+        "virtualizationMode": 1
+      },
+      "drives": [
+        {
+          "image": {
+            "uuidandversion": {
+              "uuid": "7fc8c328-41f9-4b0b-8668-1471261c6489",
+              "version": "1"
+            },
+            "name": "itmoeve/eclient:0.4",
+            "iformat": 8,
+            "dsId": "fc3af1b2-fac7-4ff6-8c69-c399d579cc82"
+          }
+        }
+      ],
+      "activate": true,
+      "interfaces": [
+        {
+          "name": "default",
+          "networkId": "74d69de1-aec0-3c91-9c87-05c3337a5505",
+          "acls": [
+            {
+              "matches": [
+                {
+                  "type": "fport",
+                  "value": "80"
+                },
+                {
+                  "type": "protocol",
+                  "value": "tcp"
+                }
+              ],
+              "id": 1
+            }
+          ]
+        }
+      ],
+      "volumeRefList": [
+        {
+          "uuid": "67c7a2a3-7407-47bf-525a-1754bacc2411",
+          "mount_dir": "/"
+        }
+      ]
+    },
+    {
+      "uuidandversion": {
+        "uuid": "2452017e-5970-286a-6970-b402082bbbc2",
+        "version": "1"
+      },
+      "displayname": "app5",
+      "fixedresources": {
+        "memory": 512000,
+        "maxmem": 512000,
+        "vcpus": 1,
+        "virtualizationMode": 1
+      },
+      "drives": [
+        {
+          "image": {
+            "uuidandversion": {
+              "uuid": "7fc8c328-41f9-4b0b-8668-1471261c6489",
+              "version": "1"
+            },
+            "name": "itmoeve/eclient:0.4",
+            "iformat": 8,
+            "dsId": "fc3af1b2-fac7-4ff6-8c69-c399d579cc82"
+          }
+        }
+      ],
+      "activate": true,
+      "interfaces": [
+        {
+          "name": "default",
+          "networkId": "63c58cd0-9cb1-2b80-8b76-04b222694404",
+          "acls": [
+            {
+              "matches": [
+                {
+                  "type": "fport",
+                  "value": "80"
+                },
+                {
+                  "type": "protocol",
+                  "value": "tcp"
+                }
+              ],
+              "id": 1
+            }
+          ]
+        }
+      ],
+      "volumeRefList": [
+        {
+          "uuid": "56b52400-6450-4444-5555-213acbdd7ee1",
+          "mount_dir": "/"
+        }
+      ]
+    },
+    {
+      "uuidandversion": {
+        "uuid": "4674039e-7b90-4a8f-8b92-f62921ab3faf",
+        "version": "1"
+      },
+      "displayname": "app6",
       "fixedresources": {
         "memory": 512000,
         "maxmem": 512000,
@@ -298,6 +414,18 @@
           "end": "192.168.2.2"
         }
       }
+    },
+    {
+      "id": "6822e35f-c1b8-43ca-b344-0bbc0ece8cf4",
+      "type": 4,
+      "ip": {
+        "dhcp": 4,
+        "gw": "192.168.3.1",
+        "dhcpRange": {
+          "start": "192.168.3.2",
+          "end": "192.168.3.2"
+        }
+      }
     }
   ],
   "datastores": [
@@ -353,7 +481,12 @@
     },
     {
       "name": "eth2",
+      "uplink": true,
       "networkUUID": "6822e35f-c1b8-43ca-b344-0bbc0ece8cf3"
+    },
+    {
+      "name": "eth3",
+      "networkUUID": "6822e35f-c1b8-43ca-b344-0bbc0ece8cf4"
     }
   ],
   "deviceIoList": [
@@ -391,6 +524,19 @@
       },
       "logicallabel": "eth2",
       "assigngrp": "eth2",
+      "usage": 2,
+      "usagePolicy": {
+        "freeUplink": true
+      }
+    },
+    {
+      "ptype": 1,
+      "phylabel": "eth3",
+      "phyaddrs": {
+        "Ifname": "eth3"
+      },
+      "logicallabel": "eth3",
+      "assigngrp": "eth3",
       "usage": 1,
       "usagePolicy": {
         "freeUplink": true
@@ -599,15 +745,71 @@
     },
     {
       "uuidandversion": {
-        "uuid": "85e7aef2-bfd1-4da2-ad98-06d4448b6606",
+        "uuid": "74d69de1-aec0-3c91-9c87-05c3337a5505",
         "version": "1"
       },
       "displayname": "ni4",
-      "instType": 1,
+      "instType": 3,
+      "activate": true,
+      "port": {
+        "type": 1,
+        "name": "eth1"
+      },
+      "cfg": {
+        "oconfig": "TODO - VPN opaque config"
+      },
+      "ipType": 1,
+      "ip": {
+        "subnet": "10.10.10.0/24",
+        "gateway": "10.10.10.1",
+        "dns": [
+          "10.10.10.1"
+        ],
+        "dhcpRange": {
+          "start": "10.10.10.2",
+          "end": "10.10.10.254"
+        }
+      }
+    },
+    {
+      "uuidandversion": {
+        "uuid": "63c58cd0-9cb1-2b80-8b76-04b222694404",
+        "version": "1"
+      },
+      "displayname": "ni5",
+      "instType": 3,
       "activate": true,
       "port": {
         "type": 1,
         "name": "eth2"
+      },
+      "cfg": {
+        "oconfig": "TODO - VPN opaque config"
+      },
+      "ipType": 1,
+      "ip": {
+        "subnet": "10.10.10.0/24",
+        "gateway": "10.10.10.1",
+        "dns": [
+          "10.10.10.1"
+        ],
+        "dhcpRange": {
+          "start": "10.10.10.2",
+          "end": "10.10.10.254"
+        }
+      }
+    },
+    {
+      "uuidandversion": {
+        "uuid": "85e7aef2-bfd1-4da2-ad98-06d4448b6606",
+        "version": "1"
+      },
+      "displayname": "ni6",
+      "instType": 1,
+      "activate": true,
+      "port": {
+        "type": 1,
+        "name": "eth3"
       },
       "cfg": {},
       "ipType": 1,
@@ -631,6 +833,20 @@
     },
     {
       "uuid": "7136a312-7f66-4cd0-80af-f7a61ed32e7f",
+      "dsId": "fc3af1b2-fac7-4ff6-8c69-c399d579cc82",
+      "URL": "itmoeve/eclient:0.4",
+      "iformat": 8,
+      "displayName": "itmoeve/eclient:0.4"
+    },
+    {
+      "uuid": "d42d45cf-dbeq-4218-9444-cccdddc45563",
+      "dsId": "fc3af1b2-fac7-4ff6-8c69-c399d579cc82",
+      "URL": "itmoeve/eclient:0.4",
+      "iformat": 8,
+      "displayName": "itmoeve/eclient:0.4"
+    },
+    {
+      "uuid": "e31b34ab-75ca-22aa-bbcc-d4577ba26711",
       "dsId": "fc3af1b2-fac7-4ff6-8c69-c399d579cc82",
       "URL": "itmoeve/eclient:0.4",
       "iformat": 8,
@@ -670,12 +886,28 @@
       "displayName": "app3_0_m_0"
     },
     {
+      "uuid": "67c7a2a3-7407-47bf-525a-1754bacc2411",
+      "origin": {
+        "type": 2,
+        "downloadContentTreeID": "d42d45cf-dbeq-4218-9444-cccdddc45563"
+      },
+      "displayName": "app4_0_m_0"
+    },
+    {
+      "uuid": "56b52400-6450-4444-5555-213acbdd7ee1",
+      "origin": {
+        "type": 2,
+        "downloadContentTreeID": "e31b34ab-75ca-22aa-bbcc-d4577ba26711"
+      },
+      "displayName": "app5_0_m_0"
+    },
+    {
       "uuid": "66d8b3b4-8518-46b6-987b-140958cb076b",
       "origin": {
         "type": 2,
         "downloadContentTreeID": "df2d00f0-ddde-44ca-99e4-c57dc47a48b3"
       },
-      "displayName": "app4_0_m_0"
+      "displayName": "app6_0_m_0"
     }
   ]
 }

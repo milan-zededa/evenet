@@ -1,6 +1,29 @@
 version: '3.3'
 
 services:
+  # Cloud
+  # -----
+  cloud1:
+    container_name: cloud1
+    image: "evenet/vswitch"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    dns:
+      - 8.8.8.8
+    volumes:
+      - ./scripts:/scripts
+
+  cloud2:
+    container_name: cloud2
+    image: "evenet/vswitch"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    dns:
+      - 8.8.8.8
+    volumes:
+      - ./scripts:/scripts
 
   # Gateway
   # -------
@@ -61,6 +84,26 @@ services:
 
   app4:
     container_name: app4
+    image: "evenet/app"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    volumes:
+      - ./scripts:/scripts
+    command: sleep infinity
+
+  app5:
+    container_name: app5
+    image: "evenet/app"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    volumes:
+      - ./scripts:/scripts
+    command: sleep infinity
+
+  app6:
+    container_name: app6
     image: "evenet/app"
     privileged: true
     network_mode: "none"

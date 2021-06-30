@@ -23,14 +23,14 @@ root@6ba02e9464c0:/# ip addr
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
     inet 127.0.0.1/8 scope host lo
        valid_lft forever preferred_lft forever
-2: nbu1x1.1@if5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
-    link/ether c6:c5:7d:09:41:30 brd ff:ff:ff:ff:ff:ff link-netns ni1
-    inet 10.10.1.66/24 brd 10.10.1.255 scope global dynamic nbu1x1.1
-       valid_lft 3513sec preferred_lft 3513sec
-4: nbu2x1.1@if5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
-    link/ether e6:53:75:fc:3a:45 brd ff:ff:ff:ff:ff:ff link-netns ni2
-    inet 192.168.1.64/24 brd 192.168.1.255 scope global dynamic nbu2x1.1
-       valid_lft 3513sec preferred_lft 3513sec
+2: nbu1x1.1@if20: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether 46:e9:3b:af:5b:2d brd ff:ff:ff:ff:ff:ff link-netns zedbox
+    inet 10.10.1.72/24 brd 10.10.1.255 scope global nbu1x1.1
+       valid_lft forever preferred_lft forever
+4: nbu2x1.1@if21: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether 16:ad:1e:c5:c6:a6 brd ff:ff:ff:ff:ff:ff link-netns zedbox
+    inet 192.168.1.146/24 brd 192.168.1.255 scope global nbu2x1.1
+       valid_lft forever preferred_lft forever
 ```
 
 Try `github.com` (should be ALLOWED) and `google.com` (should be BLOCKED) from `app1`:
@@ -51,7 +51,7 @@ curl: (28) Connection timed out after 3000 milliseconds
 Check conntracks for the allowed connection. Notice that there are two entries - one in the NI-specific CT zone and
 the second one in the common `999` CT zone. Packet is being routed and NATed twice:
 ```
-$ docker exec -it ni1 bash
+$ docker exec -it zedbox bash
 root@559d039a1383:/# conntrack -L
 tcp      6 118 TIME_WAIT src=10.10.1.53 dst=140.82.121.4 sport=40486 dport=80 src=140.82.121.4 dst=169.254.100.2 sport=80 dport=40486 [ASSURED] mark=16777217 zone=1 use=1
 tcp      6 118 TIME_WAIT src=169.254.100.2 dst=140.82.121.4 sport=40486 dport=80 src=140.82.121.4 dst=192.168.0.2 sport=80 dport=40486 [ASSURED] mark=0 zone=999 use=1
@@ -59,13 +59,13 @@ tcp      6 118 TIME_WAIT src=169.254.100.2 dst=140.82.121.4 sport=40486 dport=80
 
 Check that conntrack was created even for dropped connections (in the NI-specific CT zone only where the packet ended at the dummy interface):
 ```
-$ docker exec -it ni1 bash
+$ docker exec -it zedbox bash
 root@559d039a1383:/# conntrack -L
 tcp      6 118 SYN_SENT src=10.10.1.53 dst=216.58.212.174 sport=56562 dport=80 [UNREPLIED] src=216.58.212.174 dst=10.10.1.53 sport=80 dport=56562 mark=33554431 zone=1 use=1
 ...
 ```
 
-Check that `app1` can access `app2` in the shared network `ni2`:
+Check that `app1` can access `app2` in the shared network `NI2`:
 ```
 $ docker exec -it app1 bash
 root@6ba02e9464c0:/# curl --interface nbu2x1.1 app2; echo $?
@@ -75,7 +75,7 @@ root@6ba02e9464c0:/# curl --interface nbu2x1.1 app2; echo $?
 
 Note that `eidset` was applied in this case:
 ```
-$ docker exec -it ni2 bash
+$ docker exec -it zedbox bash
 root@99669d7cb66c:/# iptables -L -v -t mangle
 Chain PREROUTING (policy ACCEPT 0 packets, 0 bytes)
  pkts bytes target     prot opt in     out     source               destination
@@ -86,7 +86,7 @@ Chain PREROUTING (policy ACCEPT 0 packets, 0 bytes)
 
 Conntrack is created even in this case (NI-zone only, zone `999` is not traversed here):
 ```
-$ docker exec -it ni2 bash
+$ docker exec -it zedbox bash
 root@99669d7cb66c:/# conntrack -L
 tcp      6 115 TIME_WAIT src=192.168.1.113 dst=192.168.1.135 sport=40380 dport=80 src=192.168.1.135 dst=192.168.1.113 sport=80 dport=40380 [ASSURED] mark=16777217 zone=2 use=1
 ```
@@ -107,7 +107,7 @@ tcp      6 118 TIME_WAIT src=169.254.100.2 dst=192.168.0.2 sport=55096 dport=808
 tcp      6 118 TIME_WAIT src=169.254.100.2 dst=169.254.100.6 sport=55096 dport=8080 src=192.168.1.135 dst=169.254.100.2 sport=80 dport=55096 [ASSURED] mark=33554434 zone=2 use=1
 ```
 
-Try to hairpin from `app1` to `app2` via portmap in the `NI2` namespace:
+Try to hairpin from `app1` to `app2` via portmap in the `NI2` zone:
 ```
 $ docker exec -it app1 bash
 root@8d44d3f125e1:/# ip route del default
@@ -174,10 +174,151 @@ tcp      6 104 TIME_WAIT src=192.168.1.2 dst=192.168.0.2 sport=48944 dport=8080 
 tcp      6 104 TIME_WAIT src=169.254.100.5 dst=169.254.100.6 sport=48944 dport=8080 src=192.168.1.135 dst=169.254.100.5 sport=80 dport=48944 [ASSURED] mark=33554434 zone=2 use=1
 ```
 
-Try to hairpin from `app4` to `app2` via portmap outside the edge device:
+Try to establish IPsec tunnel between `NI4` and `cloud1`:
+```
+$ docker exec zedbox swanctl --initiate --child gw1
+[IKE] initiating IKE_SA gw1[1] to 192.168.111.1
+[ENC] generating IKE_SA_INIT request 0 [ SA KE No N(NATD_S_IP) N(NATD_D_IP) N(FRAG_SUP) N(HASH_ALG) N(REDIR_SUP) ]
+[NET] sending packet: from 169.254.100.13[500] to 192.168.111.1[500] (464 bytes)
+[NET] received packet: from 192.168.111.1[500] to 169.254.100.13[500] (472 bytes)
+[ENC] parsed IKE_SA_INIT response 0 [ SA KE No N(NATD_S_IP) N(NATD_D_IP) N(FRAG_SUP) N(HASH_ALG) N(CHDLESS_SUP) N(MULT_AUTH) ]
+[CFG] selected proposal: IKE:AES_CBC_256/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_2048
+[IKE] local host is behind NAT, sending keep alives
+[CFG] no IDi configured, fall back on IP address
+[IKE] authentication of '169.254.100.13' (myself) with pre-shared key
+[IKE] establishing CHILD_SA gw1{1}
+[ENC] generating IKE_AUTH request 1 [ IDi AUTH SA TSi TSr N(MULT_AUTH) N(EAP_ONLY) N(MSG_ID_SYN_SUP) ]
+[NET] sending packet: from 169.254.100.13[4500] to 192.168.111.1[4500] (220 bytes)
+[NET] received packet: from 192.168.111.1[4500] to 169.254.100.13[4500] (204 bytes)
+[ENC] parsed IKE_AUTH response 1 [ IDr AUTH SA TSi TSr ]
+[IKE] authentication of '192.168.111.1' with pre-shared key successful
+[IKE] IKE_SA gw1[1] established between 169.254.100.13[169.254.100.13]...192.168.111.1[192.168.111.1]
+[IKE] scheduling rekeying in 14018s
+[IKE] maximum IKE_SA lifetime 15458s
+[CFG] selected proposal: ESP:AES_CBC_128/HMAC_SHA1_96/NO_EXT_SEQ
+[IKE] CHILD_SA gw1{1} established with SPIs c206b3e3_i ca85eaf8_o and TS 10.10.10.0/24 === 192.168.0.0/24
+initiate completed successfully
+
+$ docker exec zedbox swanctl --list-sas
+gw1: #1, ESTABLISHED, IKEv2, 46afca5bab3815a7_i* 1fa571683a56e2a6_r
+  local  '169.254.100.13' @ 169.254.100.13[4500]
+  remote '192.168.111.1' @ 192.168.111.1[4500]
+  AES_CBC-256/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_2048
+  established 49s ago, rekeying in 13969s
+  gw1: #1, reqid 1, INSTALLED, TUNNEL-in-UDP, ESP:AES_CBC-128/HMAC_SHA1_96
+    installed 49s ago, rekeying in 3204s, expires in 3911s
+    in  c206b3e3 (-|0x00000004),      0 bytes,     0 packets
+    out ca85eaf8 (-|0x00000004),      0 bytes,     0 packets
+    local  10.10.10.0/24
+    remote 192.168.0.0/24
+
+$ docker exec cloud1 swanctl --list-sas
+gw: #1, ESTABLISHED, IKEv2, 46afca5bab3815a7_i 1fa571683a56e2a6_r*
+  local  '192.168.111.1' @ 192.168.111.1[4500]
+  remote '169.254.100.13' @ 192.168.1.2[4500]
+  AES_CBC-256/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_2048
+  established 71s ago, rekeying in 13184s
+  gw: #1, reqid 1, INSTALLED, TUNNEL-in-UDP, ESP:AES_CBC-128/HMAC_SHA1_96
+    installed 71s ago, rekeying in 3188s, expires in 3889s
+    in  ca85eaf8,      0 bytes,     0 packets
+    out c206b3e3,      0 bytes,     0 packets
+    local  192.168.0.0/24
+    remote 10.10.10.0/24
+```
+
+Notice that single instance of strongSwan operates for all VPN networks in the CT zone `999`:
+```
+bash-5.1# conntrack -L
+udp      17 26 src=169.254.100.13 dst=192.168.111.1 sport=500 dport=500 src=192.168.111.1 dst=192.168.1.2 sport=500 dport=500 mark=0 zone=999 use=1
+udp      17 26 src=169.254.100.13 dst=192.168.111.1 sport=4500 dport=4500 src=192.168.111.1 dst=192.168.1.2 sport=4500 dport=4500 mark=0 zone=999 use=1
+```
+
+Try to access HTTP server in `cloud1` from `app4`:
 ```
 $ docker exec -it app4 bash
-root@8d44d3df421:/# curl 192.168.0.2:8080
+root@5a911b8522cc:/# curl 192.168.0.1:80; echo $?
+...
+0
+```
+
+In this case, two conntracks are established - one for the unencrypted traffic in the `NI4` zone and the other
+for the encrypted traffic in the `999` zone:
+```
+tcp      6 61 TIME_WAIT src=10.10.10.94 dst=192.168.0.1 sport=47982 dport=80 src=192.168.0.1 dst=10.10.10.94 sport=80 dport=47982 [ASSURED] mark=67108865 zone=4 use=1
+udp      17 101 src=169.254.100.13 dst=192.168.111.1 sport=4500 dport=4500 src=192.168.111.1 dst=192.168.1.2 sport=4500 dport=64496 [ASSURED] mark=0 zone=999 use=1
+```
+
+Try to establish IPsec tunnel between `NI5` and `cloud2`:
+```
+$ docker exec zedbox swanctl --initiate --child gw2
+[IKE] initiating IKE_SA gw2[2] to 192.168.222.1
+[ENC] generating IKE_SA_INIT request 0 [ SA KE No N(NATD_S_IP) N(NATD_D_IP) N(FRAG_SUP) N(HASH_ALG) N(REDIR_SUP) ]
+[NET] sending packet: from 169.254.100.17[500] to 192.168.222.1[500] (464 bytes)
+[NET] received packet: from 192.168.222.1[500] to 169.254.100.17[500] (472 bytes)
+[ENC] parsed IKE_SA_INIT response 0 [ SA KE No N(NATD_S_IP) N(NATD_D_IP) N(FRAG_SUP) N(HASH_ALG) N(CHDLESS_SUP) N(MULT_AUTH) ]
+[CFG] selected proposal: IKE:AES_CBC_256/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_2048
+[IKE] local host is behind NAT, sending keep alives
+[CFG] no IDi configured, fall back on IP address
+[IKE] authentication of '169.254.100.17' (myself) with pre-shared key
+[IKE] establishing CHILD_SA gw2{2}
+[ENC] generating IKE_AUTH request 1 [ IDi AUTH SA TSi TSr N(MULT_AUTH) N(EAP_ONLY) N(MSG_ID_SYN_SUP) ]
+[NET] sending packet: from 169.254.100.17[4500] to 192.168.222.1[4500] (220 bytes)
+[NET] received packet: from 192.168.222.1[4500] to 169.254.100.17[4500] (204 bytes)
+[ENC] parsed IKE_AUTH response 1 [ IDr AUTH SA TSi TSr ]
+[IKE] authentication of '192.168.222.1' with pre-shared key successful
+[IKE] IKE_SA gw2[2] established between 169.254.100.17[169.254.100.17]...192.168.222.1[192.168.222.1]
+[IKE] scheduling rekeying in 14068s
+[IKE] maximum IKE_SA lifetime 15508s
+[CFG] selected proposal: ESP:AES_CBC_128/HMAC_SHA1_96/NO_EXT_SEQ
+[IKE] CHILD_SA gw2{2} established with SPIs c117176e_i c72b9ea7_o and TS 10.10.10.0/24 === 192.168.0.0/24
+initiate completed successfully
+
+$ docker exec zedbox swanctl --list-sas
+gw2: #2, ESTABLISHED, IKEv2, d58f27e45404be14_i* 2c315234f13e5f09_r
+  local  '169.254.100.17' @ 169.254.100.17[4500]
+  remote '192.168.222.1' @ 192.168.222.1[4500]
+  AES_CBC-256/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_2048
+  established 26s ago, rekeying in 14042s
+  gw2: #2, reqid 2, INSTALLED, TUNNEL-in-UDP, ESP:AES_CBC-128/HMAC_SHA1_96
+    installed 26s ago, rekeying in 3241s, expires in 3934s
+    in  c117176e (-|0x00000005),      0 bytes,     0 packets
+    out c72b9ea7 (-|0x00000005),      0 bytes,     0 packets
+    local  10.10.10.0/24
+    remote 192.168.0.0/24
+
+$ docker exec cloud2 swanctl --list-sas
+gw: #1, ESTABLISHED, IKEv2, d58f27e45404be14_i 2c315234f13e5f09_r*
+  local  '192.168.222.1' @ 192.168.222.1[4500]
+  remote '169.254.100.17' @ 192.168.2.2[4500]
+  AES_CBC-256/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_2048
+  established 43s ago, rekeying in 14080s
+  gw: #1, reqid 1, INSTALLED, TUNNEL-in-UDP, ESP:AES_CBC-128/HMAC_SHA1_96
+    installed 43s ago, rekeying in 3260s, expires in 3917s
+    in  c72b9ea7,      0 bytes,     0 packets
+    out c117176e,      0 bytes,     0 packets
+    local  192.168.0.0/24
+    remote 10.10.10.0/24
+```
+
+Try to access HTTP server in `cloud2` from `app5`:
+```
+$ docker exec -it app5 bash
+root@5a911b8522cc:/# curl 192.168.0.1:80; echo $?
+...
+0
+```
+
+In this case, two conntracks are established - one for the unencrypted traffic in the `NI5` zone and the other
+for the encrypted traffic in the `999` zone:
+```
+tcp      6 73 TIME_WAIT src=10.10.10.101 dst=192.168.0.1 sport=45190 dport=80 src=192.168.0.1 dst=10.10.10.101 sport=80 dport=45190 [ASSURED] mark=83886081 zone=5 use=1
+udp      17 113 src=169.254.100.17 dst=192.168.222.1 sport=4500 dport=4500 src=192.168.222.1 dst=192.168.2.2 sport=4500 dport=13920 [ASSURED] mark=0 zone=999 use=1
+```
+
+Try to hairpin from `app6` to `app2` via portmap outside the edge device:
+```
+$ docker exec -it app6 bash
+root@7b225ce7122:/# curl 192.168.0.2:8080
 (WORKS AND IT IS LIMITED IN BANDWIDTH)
 ```
 
@@ -188,10 +329,10 @@ tcp      6 299 ESTABLISHED src=192.168.2.86 dst=192.168.0.2 sport=33594 dport=80
 tcp      6 299 ESTABLISHED src=192.168.2.86 dst=169.254.100.6 sport=33594 dport=8080 src=192.168.1.135 dst=192.168.2.86 sport=80 dport=33594 [ASSURED] mark=33554434 zone=2 use=1
 ```
 
-Try any remote destination from `app4`. Should be blocked and leave no conntracks:
+Try any remote destination from `app6`. Should be blocked and leave no conntracks:
 ```
-$ docker exec -it app4 bash
-root@6ba02e9464c0:/# curl --connect-timeout 3 --retry 3  google.com
+$ docker exec -it app6 bash
+root@7b225ce7122:/# curl --connect-timeout 3 --retry 3  google.com
 curl: (28) Connection timed out after 3000 milliseconds
 Warning: Transient problem: timeout Will retry in 1 seconds. 3 retries left.
 curl: (28) Connection timed out after 3000 milliseconds

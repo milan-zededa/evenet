@@ -3,10 +3,10 @@
 set -x
 
 # This script is run from a network instance container.
-# It is used to configure everything for a local network instance except for ACLs
+# It is used to configure everything for a local/vpn network instance except for ACLs
 # (zedbox<->ni veth, bridge, default route, dnsmasq, http server)
 #
-# Usage: local_ni.sh <ni-index> <ni-subnet> <bridge-ipnet> <dhcp-range> <zedbox-veth-ipnet> <ni-veth-ipnet> <uplink-interface>
+# Usage: ni.sh <ni-index> <ni-subnet> <bridge-ipnet> <dhcp-range> <zedbox-veth-ipnet> <ni-veth-ipnet> <uplink-interface>
 
 function cut_mask() {
   echo ${1} | cut -d'/' -f1
@@ -86,7 +86,7 @@ EOF
 # 7. http server
 cat <<EOF > /etc/supervisor.d/http.conf
 [program:http]
-command=/scripts/http.sh ni${ni_index}-cloud-init 80 ${bridge_ip}
+command=bash -x /scripts/http.sh ni${ni_index}-cloud-init 80 ${bridge_ip}
 stdout_logfile=/dev/fd/1
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/fd/2

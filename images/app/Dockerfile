@@ -1,18 +1,13 @@
-FROM ubuntu:20.04
+FROM alpine:3.14.0
 
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y \
+RUN apk --no-cache add \
+    bash \
     netcat-openbsd \
-    isc-dhcp-client \
-    binutils \
+    dhclient \
     curl \
     wget \
     vim \
     ethtool \
     tcpdump \
-    iproute2 \
-    net-tools \
-    conntrack \
-    dnsutils \
-    iputils-ping && \
-    rm -rf /var/lib/apt/lists/*
+    conntrack-tools \
+    bind-tools

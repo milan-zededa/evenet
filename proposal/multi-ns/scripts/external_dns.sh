@@ -3,7 +3,7 @@
 set -x
 
 # This script is run from the GW container.
-# This script configures and starts dnsmasq to act as an external DNS/DHCP service for the switch network NI4.
+# This script configures and starts dnsmasq to act as an external DNS/DHCP service for the switch network NI6.
 
 cat <<EOF > /etc/dnsmasq.conf
 except-interface=lo
@@ -20,8 +20,8 @@ dhcp-ttl=600
 log-queries
 log-dhcp
 dhcp-leasefile=/run/dnsmasq.leases
-interface=gw2
-dhcp-range=192.168.2.50,192.168.2.150,60m
+interface=gw3
+dhcp-range=192.168.3.50,192.168.3.150,60m
 EOF
 
 cat <<EOF > /etc/supervisor.d/dnsmasq.conf

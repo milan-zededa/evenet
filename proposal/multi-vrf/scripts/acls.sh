@@ -62,12 +62,12 @@ function mark_remaining_traffic() {
   iptables -A PREROUTING -t mangle -j CONNMARK --save-mark
 }
 
-for vrf in vrf1 vrf2 vrf3; do
+for vrf in vrf1 vrf2 vrf3 vrf4 vrf5; do
   configure_blackhole ${vrf}
 done
 
-mark_output_traffic ${ns}
-local_ipset ${ns}
+mark_output_traffic
+local_ipset
 
 
 # App1 ACLs
@@ -165,35 +165,69 @@ iptables -A PREROUTING -t mangle -i br3 -m physdev --physdev-in nbu1x3+ -j drop-
 
 # App4 ACLs
 # ---------
-# - (switch) NI4 - ingress direction: allow ingress DNS, BOOTP, cloud-init HTTP
-iptables -A FORWARD -t filter -o eth2 -m physdev --physdev-out nbu1x4+ -p udp -m multiport --sports bootps,domain -j ACCEPT
-iptables -A FORWARD -t filter -o eth2 -m physdev --physdev-out nbu1x4+ -p tcp --sport domain -j ACCEPT
-# - (switch) NI4 - ingress direction: allow 192.168.0.0/16 but limit to 5/s, bursts of 15
+# - NI4: allow DNS, BOOTP, cloud-init HTTP
+configure_mark_and_accept_chain proto-nbu1x4-6 0x6
+iptables -A PREROUTING -t mangle -i br4 -m physdev --physdev-in nbu1x4+ -d 10.10.10.1 -p udp -m multiport --dports bootps,domain -j proto-nbu1x4-6
+configure_mark_and_accept_chain proto-nbu1x4-7 0x7
+iptables -A PREROUTING -t mangle -i br4 -m physdev --physdev-in nbu1x4+ -d 10.10.10.1 -p tcp --dport domain -j proto-nbu1x4-7
+configure_mark_and_accept_chain proto-nbu1x4-8 0x8
+iptables -A PREROUTING -t mangle -i br4 -m physdev --physdev-in nbu1x4+ -d 169.254.169.254 -p tcp --dport http -j proto-nbu1x4-8
+# - NI4: allow fport=80 (TCP)
+configure_mark_and_accept_chain nbu1x4-1 0x4000001
+iptables -A PREROUTING -t mangle -i br4 -m physdev --physdev-in nbu1x4+ -d 0.0.0.0/0 -p tcp --dport 80 -j nbu1x4-1
+# - NI4: drop the rest
+configure_mark_and_accept_chain drop-all-nbu1x4 0x4ffffff
+iptables -A PREROUTING -t mangle -i br4 -m physdev --physdev-in nbu1x4+ -j drop-all-nbu1x4
+
+
+# App5 ACLs
+# ---------
+# - NI5: allow DNS, BOOTP, cloud-init HTTP
+configure_mark_and_accept_chain proto-nbu1x5-6 0x6
+iptables -A PREROUTING -t mangle -i br5 -m physdev --physdev-in nbu1x5+ -d 10.10.10.1 -p udp -m multiport --dports bootps,domain -j proto-nbu1x5-6
+configure_mark_and_accept_chain proto-nbu1x5-7 0x7
+iptables -A PREROUTING -t mangle -i br5 -m physdev --physdev-in nbu1x5+ -d 10.10.10.1 -p tcp --dport domain -j proto-nbu1x5-7
+configure_mark_and_accept_chain proto-nbu1x5-8 0x8
+iptables -A PREROUTING -t mangle -i br5 -m physdev --physdev-in nbu1x5+ -d 169.254.169.254 -p tcp --dport http -j proto-nbu1x5-8
+# - NI5: allow fport=80 (TCP)
+configure_mark_and_accept_chain nbu1x5-1 0x5000001
+iptables -A PREROUTING -t mangle -i br5 -m physdev --physdev-in nbu1x5+ -d 0.0.0.0/0 -p tcp --dport 80 -j nbu1x5-1
+# - NI5: drop the rest
+configure_mark_and_accept_chain drop-all-nbu1x5 0x5ffffff
+iptables -A PREROUTING -t mangle -i br5 -m physdev --physdev-in nbu1x5+ -j drop-all-nbu1x5
+
+
+# App6 ACLs
+# ---------
+# - (switch) NI6 - ingress direction: allow ingress DNS, BOOTP, cloud-init HTTP
+iptables -A FORWARD -t filter -o eth3 -m physdev --physdev-out nbu1x6+ -p udp -m multiport --sports bootps,domain -j ACCEPT
+iptables -A FORWARD -t filter -o eth3 -m physdev --physdev-out nbu1x6+ -p tcp --sport domain -j ACCEPT
+# - (switch) NI6 - ingress direction: allow 192.168.0.0/16 but limit to 5/s, bursts of 15
 #     - TODO: this one is weird, why not to use --physdev-out?
-iptables -A FORWARD -t filter -i eth2 -o eth2 -s 192.168.0.0/16 -m limit --limit 5/sec --limit-burst 15 -j ACCEPT
-# - (switch) NI4 - ingress direction: block the rest
-iptables -A FORWARD -t filter -o eth2 -m physdev --physdev-out nbu1x4+ -j DROP
+iptables -A FORWARD -t filter -i eth3 -o eth3 -s 192.168.0.0/16 -m limit --limit 5/sec --limit-burst 15 -j ACCEPT
+# - (switch) NI6 - ingress direction: block the rest
+iptables -A FORWARD -t filter -o eth3 -m physdev --physdev-out nbu1x6+ -j DROP
 
-# - (switch) NI4 - egress direction: allow ingress DNS, BOOTP, cloud-init HTTP
-iptables -A PREROUTING -t raw -i eth2 -m physdev --physdev-in nbu1x4+ -p udp -m multiport --dports bootps,domain -j ACCEPT
-iptables -A PREROUTING -t raw -i eth2 -m physdev --physdev-in nbu1x4+ -p tcp --dport domain -j ACCEPT
-# - (switch) NI4 - egress direction: allow 192.168.0.0/16 but limit to 5/s, bursts of 15
-iptables -A PREROUTING -t raw -i eth2 -m physdev --physdev-in nbu1x4+ -d 192.168.0.0/16 -m limit --limit 5/sec --limit-burst 15 -j ACCEPT
-# - (switch) NI4 - egress direction: block the rest
-iptables -A PREROUTING -t raw -i eth2 -m physdev --physdev-in nbu1x4+ -j DROP
+# - (switch) NI6 - egress direction: allow ingress DNS, BOOTP, cloud-init HTTP
+iptables -A PREROUTING -t raw -i eth3 -m physdev --physdev-in nbu1x6+ -p udp -m multiport --dports bootps,domain -j ACCEPT
+iptables -A PREROUTING -t raw -i eth3 -m physdev --physdev-in nbu1x6+ -p tcp --dport domain -j ACCEPT
+# - (switch) NI6 - egress direction: allow 192.168.0.0/16 but limit to 5/s, bursts of 15
+iptables -A PREROUTING -t raw -i eth3 -m physdev --physdev-in nbu1x6+ -d 192.168.0.0/16 -m limit --limit 5/sec --limit-burst 15 -j ACCEPT
+# - (switch) NI6 - egress direction: block the rest
+iptables -A PREROUTING -t raw -i eth3 -m physdev --physdev-in nbu1x6+ -j DROP
 
-# - (switch) NI4 - mark DNS, BOOTP, cloud-init HTTP
-configure_mark_and_accept_chain proto-eth2-nbu1x4-6 0x6
-iptables -A PREROUTING -t mangle -i eth2 -m physdev --physdev-in nbu1x4+ -d 192.168.2.1 -p udp -m multiport --dports bootps,domain -j proto-eth2-nbu1x4-6
-configure_mark_and_accept_chain proto-eth2-nbu1x4-7 0x7
-iptables -A PREROUTING -t mangle -i eth2 -m physdev --physdev-in nbu1x4+ -d 192.168.2.1 -p tcp --dport domain -j proto-eth2-nbu1x4-7
-configure_mark_and_accept_chain proto-eth2-nbu1x4-8 0x8
-iptables -A PREROUTING -t mangle -i eth2 -m physdev --physdev-in nbu1x4+ -d 169.254.169.254 -p tcp --dport http -j proto-eth2-nbu1x4-8
-# - (switch) NI4 - mark dst=192.168.0.0/16 (ACE) in both directions
-configure_mark_and_accept_chain eth2-nbu1x4-1 0x4000001
-iptables -A PREROUTING -t mangle -i eth2 -m physdev --physdev-in nbu1x4+ -d 192.168.0.0/16 -j eth2-nbu1x4-1
+# - (switch) NI6 - mark DNS, BOOTP, cloud-init HTTP
+configure_mark_and_accept_chain proto-eth3-nbu1x6-6 0x6
+iptables -A PREROUTING -t mangle -i eth3 -m physdev --physdev-in nbu1x6+ -d 192.168.3.1 -p udp -m multiport --dports bootps,domain -j proto-eth3-nbu1x6-6
+configure_mark_and_accept_chain proto-eth3-nbu1x6-7 0x7
+iptables -A PREROUTING -t mangle -i eth3 -m physdev --physdev-in nbu1x6+ -d 192.168.3.1 -p tcp --dport domain -j proto-eth3-nbu1x6-7
+configure_mark_and_accept_chain proto-eth3-nbu1x6-8 0x8
+iptables -A PREROUTING -t mangle -i eth3 -m physdev --physdev-in nbu1x6+ -d 169.254.169.254 -p tcp --dport http -j proto-eth3-nbu1x6-8
+# - (switch) NI6 - mark dst=192.168.0.0/16 (ACE) in both directions
+configure_mark_and_accept_chain eth3-nbu1x6-1 0x6000001
+iptables -A PREROUTING -t mangle -i eth3 -m physdev --physdev-in nbu1x6+ -d 192.168.0.0/16 -j eth3-nbu1x6-1
 # TODO: why not to use --physdev-out?
-iptables -A PREROUTING -t mangle -i eth2 -s 192.168.0.0/16 -j eth2-nbu1x4-1
+iptables -A PREROUTING -t mangle -i eth3 -s 192.168.0.0/16 -j eth3-nbu1x6-1
 # Note: dropped flows are not marked for switch networks
 
 
@@ -204,6 +238,10 @@ configure_mark_and_accept_chain eve-veth2 0xa
 iptables -A PREROUTING -t mangle -i veth2.1 -s ${veth_net_prefix}.5 -j eve-veth2
 configure_mark_and_accept_chain eve-veth3 0xa
 iptables -A PREROUTING -t mangle -i veth3.1 -s ${veth_net_prefix}.9 -j eve-veth3
+configure_mark_and_accept_chain eve-veth4 0xa
+iptables -A PREROUTING -t mangle -i veth4.1 -s ${veth_net_prefix}.13 -j eve-veth4
+configure_mark_and_accept_chain eve-veth5 0xa
+iptables -A PREROUTING -t mangle -i veth5.1 -s ${veth_net_prefix}.17 -j eve-veth5
 
 # Remaining common rules.
 # Special mark for ICMP

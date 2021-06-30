@@ -45,8 +45,24 @@ ip netns exec zedbox ip link add name eth2 type bridge
 ip netns exec zedbox ip link set dev eth2 up
 ip netns exec zedbox ip link set dev keth2 master eth2
 ip netns exec zedbox ip addr add 192.168.2.2/24 dev eth2
+# - instead of using DHCP, configure default route statically in this simulation
+# - this default route is for zedbox only, NIs use PBR
+ip netns exec zedbox ip route add default via 192.168.2.1 dev eth2 src 192.168.2.2 metric 208
+
+# gw3 <-> keth3 <-> eth3
+ip link add name gw3 type veth peer name keth3
+ip link set keth3 netns zedbox
+ip link set gw3 up
+ip netns exec zedbox ip link set keth3 up
+ip addr add 192.168.3.1/24 dev gw3
+ip netns exec zedbox ip link set keth3 up
+ip netns exec zedbox ip link add name eth3 type bridge
+ip netns exec zedbox ip link set dev eth3 up
+ip netns exec zedbox ip link set dev keth3 master eth3
+ip netns exec zedbox ip addr add 192.168.3.2/24 dev eth3
 
 # gw <-> host
 iptables -t nat -A POSTROUTING -o eth0 -s 192.168.0.0/24 -j MASQUERADE
 iptables -t nat -A POSTROUTING -o eth0 -s 192.168.1.0/24 -j MASQUERADE
 iptables -t nat -A POSTROUTING -o eth0 -s 192.168.2.0/24 -j MASQUERADE
+iptables -t nat -A POSTROUTING -o eth0 -s 192.168.3.0/24 -j MASQUERADE
