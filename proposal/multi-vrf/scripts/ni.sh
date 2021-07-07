@@ -107,9 +107,12 @@ ipset -N ipv4.github.com hash:ip family inet
 ipset -N ipv6.github.com hash:ip family inet6
 mkdir -p /run/hosts-${br_name}/
 
+# Run inside VRF using "ip vrf exec" (eBPF is being used behind the scenes).
+# Alternatively, this can be achieved using LD_PRELOAD:
+#   /usr/bin/setnif.sh ${vrf_name} dnsmasq -d -b -C /etc/dnsmasq-${br_name}.conf
 cat <<EOF > /etc/supervisor.d/dnsmasq-${br_name}.conf
 [program:dnsmasq-${br_name}]
-command=/usr/bin/setnif.sh ${vrf_name} dnsmasq -d -b -C /etc/dnsmasq-${br_name}.conf
+command=ip vrf exec ${vrf_name} dnsmasq -d -b -C /etc/dnsmasq-${br_name}.conf
 stdout_logfile=/dev/fd/1
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/fd/2

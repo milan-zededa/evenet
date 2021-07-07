@@ -47,6 +47,12 @@ services:
     pid: "host"
     dns:
       - 8.8.8.8
+    # memlock limits were causing "ip vrf exec" to fail.
+    # Rather than to look for a particular value we disable memlock limits altogether.
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     volumes:
       - ./scripts:/scripts
 

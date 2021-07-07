@@ -8,6 +8,17 @@
 
 See `proposal/multi-vrf` sub-directory.
 
+## Prerequisites
+
+The Multi-VRF solution uses `ip vrf exec` to run VRF-unaware processes, such as `dnsmasq`,
+in the context of a given VRF device. However, there is an [issue with docker][1] affecting
+cgroup2 matching and consequently breaking eBPFs with cgroup hooks inside docker containers.
+
+If you are experiencing this issue, add `cgroup_no_v1=net_prio,net_cls` to the kernel command
+line arguments as suggested in the bug report.
+
+[1]: https://bugzilla.kernel.org/show_bug.cgi?id=203483
+
 ## Deploy & Test
 
 Deploy simulation of the scenario with per-NI VRF:
@@ -226,7 +237,7 @@ gw: #1, ESTABLISHED, IKEv2, 46afca5bab3815a7_i 1fa571683a56e2a6_r*
     remote 10.10.10.0/24
 ```
 
-Notice that single instance of strongSwan operates for all VPN networks in the CT zone `999`:
+Notice that a single instance of strongSwan operates for all VPN networks in the CT zone `999`:
 ```
 bash-5.1# conntrack -L
 udp      17 26 src=169.254.100.13 dst=192.168.111.1 sport=500 dport=500 src=192.168.111.1 dst=192.168.1.2 sport=500 dport=500 mark=0 zone=999 use=1
@@ -324,9 +335,9 @@ root@7b225ce7122:/# curl 192.168.0.2:8080
 
 In this case, there are 3 conntracks inside the zedbox namespace - switch network does not use the `999` zone (but portmap does):
 ```
-tcp      6 299 ESTABLISHED src=192.168.2.86 dst=192.168.0.2 sport=33594 dport=8080 src=192.168.0.2 dst=192.168.2.86 sport=8080 dport=33594 [ASSURED] mark=67108865 zone=4 use=1
-tcp      6 299 ESTABLISHED src=192.168.2.86 dst=192.168.0.2 sport=33594 dport=8080 src=169.254.100.6 dst=192.168.2.86 sport=8080 dport=33594 [ASSURED] mark=0 zone=999 use=1
-tcp      6 299 ESTABLISHED src=192.168.2.86 dst=169.254.100.6 sport=33594 dport=8080 src=192.168.1.135 dst=192.168.2.86 sport=80 dport=33594 [ASSURED] mark=33554434 zone=2 use=1
+tcp      6 299 ESTABLISHED src=192.168.3.123 dst=244.1.1.6 sport=33212 dport=8080 src=192.168.1.106 dst=192.168.3.123 sport=80 dport=33212 [ASSURED] mark=33554434 zone=2 use=1
+tcp      6 299 ESTABLISHED src=192.168.3.123 dst=192.168.0.2 sport=33212 dport=8080 src=244.1.1.6 dst=192.168.3.123 sport=8080 dport=33212 [ASSURED] mark=0 zone=999 use=1
+tcp      6 299 ESTABLISHED src=192.168.3.123 dst=192.168.0.2 sport=33212 dport=8080 src=192.168.0.2 dst=192.168.3.123 sport=8080 dport=33212 [ASSURED] mark=100663297 zone=6 use=1
 ```
 
 Try any remote destination from `app6`. Should be blocked and leave no conntracks:

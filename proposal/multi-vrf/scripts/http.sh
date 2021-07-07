@@ -18,7 +18,9 @@ cat /www/rand-${srv_name}.data >> /www/index-${srv_name}.html
 while true
 do
   if [ -n "${interface}" ]; then
-    /usr/bin/setnif.sh ${interface} nc -l ${ip} ${port} < /www/index-${srv_name}.html
+    ip vrf exec ${interface} nc -l ${ip} ${port} < /www/index-${srv_name}.html
+    # Or alternatively using LD_PRELOAD:
+    # /usr/bin/setnif.sh ${interface} nc -l ${ip} ${port} < /www/index-${srv_name}.html
   else
     nc -l ${ip} ${port} < /www/index-${srv_name}.html
   fi
