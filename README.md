@@ -21,6 +21,7 @@ This is the simplest scenario we could think of that covers all important aspect
     - vpn network `NI5`, using `eth2` as uplink
     - switch network `NI6`, bridged with `eth3`
 - 6 applications are deployed:
+    - `app3` is VM-in-container, the other applications are only containers
     - `app1` connected to `NI1` and `NI2`
         - it runs HTTP server on the local port `80`
     - `app2` connected to `NI2`

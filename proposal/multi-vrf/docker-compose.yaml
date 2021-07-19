@@ -86,7 +86,8 @@ services:
     pid: "host"
     volumes:
       - ./scripts:/scripts
-    command: sleep infinity
+    environment:
+      QEMU_TAP: "nbu1x3"
 
   app4:
     container_name: app4
@@ -96,7 +97,6 @@ services:
     pid: "host"
     volumes:
       - ./scripts:/scripts
-    command: sleep infinity
 
   app5:
     container_name: app5
@@ -106,7 +106,6 @@ services:
     pid: "host"
     volumes:
       - ./scripts:/scripts
-    command: sleep infinity
 
   app6:
     container_name: app6
@@ -116,4 +115,3 @@ services:
     pid: "host"
     volumes:
       - ./scripts:/scripts
-    command: sleep infinity

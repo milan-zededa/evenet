@@ -51,12 +51,12 @@ docker exec zedbox /scripts/ni.sh 5 10.10.10.0/24  10.10.10.1/24  10.10.10.50,10
 docker exec zedbox /scripts/vpn_nis.sh ${veth_net_prefix}
 
 # Configure downlink interfaces between apps and network instances.
-docker exec app1 /scripts/downlink.sh  1 nbu1x1 br1  2 nbu2x1 br2
-docker exec app2 /scripts/downlink.sh  2 nbu1x2 br2
-docker exec app3 /scripts/downlink.sh  3 nbu1x3 br3
-docker exec app4 /scripts/downlink.sh  4 nbu1x4 br4
-docker exec app5 /scripts/downlink.sh  5 nbu1x5 br5
-docker exec app6 /scripts/downlink.sh  6 nbu1x6 eth3
+docker exec app1 /scripts/downlink_veth.sh  1 nbu1x1 br1  2 nbu2x1 br2
+docker exec app2 /scripts/downlink_veth.sh  2 nbu1x2 br2
+docker exec app3 /scripts/downlink_tap.sh   3 nbu1x3 br3
+docker exec app4 /scripts/downlink_veth.sh  4 nbu1x4 br4
+docker exec app5 /scripts/downlink_veth.sh  5 nbu1x5 br5
+docker exec app6 /scripts/downlink_veth.sh  6 nbu1x6 eth3
 
 # CT zone for the switch network
 docker exec zedbox /scripts/switch_ni.sh 6 nbu1x6 eth3
@@ -65,7 +65,7 @@ docker exec zedbox /scripts/switch_ni.sh 6 nbu1x6 eth3
 docker exec zedbox /scripts/hosts.sh 1 app1 nbu1x1.1
 docker exec zedbox /scripts/hosts.sh 2 app1 nbu2x1.1
 docker exec zedbox /scripts/hosts.sh 2 app2 nbu1x2.1
-docker exec zedbox /scripts/hosts.sh 3 app3 nbu1x3.1
+#docker exec zedbox /scripts/hosts.sh 3 app3 nbu1x3.1
 docker exec zedbox /scripts/hosts.sh 4 app4 nbu1x4.1
 docker exec zedbox /scripts/hosts.sh 5 app5 nbu1x5.1
 

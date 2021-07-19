@@ -138,10 +138,20 @@ Warning: Transient problem: timeout Will retry in 4 seconds. 1 retries left.
 curl: (28) Connection timed out after 3001 milliseconds
 ```
 
-Try any website from `app3`:
+Try any website from `app3` (VM in container):
 ```
 $ docker exec -it app3 bash
-root@604474ae312b:/# curl zededa.com; echo $?
+bash-5.1# telnet 127.0.0.1 7777
+Connected to 127.0.0.1
+
+Entering character mode
+Escape character is '^]'.
+
+login as 'cirros' user. default password: 'gocubsgo'. use 'sudo' for root.
+cirros login: cirros
+Password: 
+$ 
+$ curl zededa.com; echo $?
 <html>
 <head><title>301 Moved Permanently</title></head>
 <body>
@@ -150,11 +160,23 @@ root@604474ae312b:/# curl zededa.com; echo $?
 </body>
 </html>
 0
+
+(to exit telnet type "Ctrl + ]")
 ```
 
 Try to hairpin from `app3` to `app2` via portmap outside the edge device (verify with `docker exec -it gw tcpdump -i any -n`):
 ```
 $ docker exec -it app3 bash
+bash-5.1# telnet 127.0.0.1 7777
+Connected to 127.0.0.1
+
+Entering character mode
+Escape character is '^]'.
+
+login as 'cirros' user. default password: 'gocubsgo'. use 'sudo' for root.
+cirros login: cirros
+Password: 
+$ 
 root@8d44d3df421:/# curl 192.168.0.2:8080; echo $?
 ...
 0

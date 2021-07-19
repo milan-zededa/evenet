@@ -50,18 +50,18 @@ docker exec ni4 /scripts/vpn_ni.sh ${veth_net_prefix}.14 192.168.111.1 10.10.10.
 docker exec ni5 /scripts/vpn_ni.sh ${veth_net_prefix}.18 192.168.222.1 10.10.10.0/24 192.168.0.0/24
 
 # Configure downlink interfaces between apps and network instances.
-docker exec app1 /scripts/downlink.sh  nbu1x1 ni1 br  nbu2x1 ni2 br
-docker exec app2 /scripts/downlink.sh  nbu1x2 ni2 br
-docker exec app3 /scripts/downlink.sh  nbu1x3 ni3 br
-docker exec app4 /scripts/downlink.sh  nbu1x4 ni4 br
-docker exec app5 /scripts/downlink.sh  nbu1x5 ni5 br
-docker exec app6 /scripts/downlink.sh  nbu1x6 ni6 eth3
+docker exec app1 /scripts/downlink_veth.sh  nbu1x1 ni1 br  nbu2x1 ni2 br
+docker exec app2 /scripts/downlink_veth.sh  nbu1x2 ni2 br
+docker exec app3 /scripts/downlink_tap.sh   nbu1x3 ni3 br
+docker exec app4 /scripts/downlink_veth.sh  nbu1x4 ni4 br
+docker exec app5 /scripts/downlink_veth.sh  nbu1x5 ni5 br
+docker exec app6 /scripts/downlink_veth.sh  nbu1x6 ni6 eth3
 
 # Configure static DNS entries
 docker exec ni1 /scripts/hosts.sh app1 nbu1x1.1
 docker exec ni2 /scripts/hosts.sh app1 nbu2x1.1
 docker exec ni2 /scripts/hosts.sh app2 nbu1x2.1
-docker exec ni3 /scripts/hosts.sh app3 nbu1x3.1
+#docker exec ni3 /scripts/hosts.sh app3 nbu1x3.1
 docker exec ni4 /scripts/hosts.sh app4 nbu1x4.1
 docker exec ni5 /scripts/hosts.sh app5 nbu1x5.1
 

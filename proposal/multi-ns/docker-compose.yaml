@@ -146,9 +146,10 @@ services:
     privileged: true
     network_mode: "none"
     pid: "host"
+    environment:
+      QEMU_TAP: "nbu1x3"
     volumes:
       - ./scripts:/scripts
-    command: sleep infinity
 
   app4:
     container_name: app4
@@ -158,7 +159,6 @@ services:
     pid: "host"
     volumes:
       - ./scripts:/scripts
-    command: sleep infinity
 
   app5:
     container_name: app5
@@ -168,7 +168,6 @@ services:
     pid: "host"
     volumes:
       - ./scripts:/scripts
-    command: sleep infinity
 
   app6:
     container_name: app6
@@ -178,4 +177,3 @@ services:
     pid: "host"
     volumes:
       - ./scripts:/scripts
-    command: sleep infinity
