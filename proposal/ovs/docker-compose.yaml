@@ -1,0 +1,150 @@
+version: '3.3'
+
+volumes:
+  ovs-run-volume:
+  ovs-log-volume:
+
+services:
+  # Cloud
+  # -----
+  cloud1:
+    container_name: cloud1
+    image: "evenet/vswitch"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    dns:
+      - 8.8.8.8
+    volumes:
+      - ./scripts:/scripts
+
+  cloud2:
+    container_name: cloud2
+    image: "evenet/vswitch"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    dns:
+      - 8.8.8.8
+    volumes:
+      - ./scripts:/scripts
+
+  # Gateway
+  # -------
+  gw:
+    container_name: gw
+    image: "evenet/vswitch"
+    privileged: true
+    pid: "host"
+    dns:
+      - 8.8.8.8
+    volumes:
+      - ./scripts:/scripts
+
+  # Zedbox
+  # ------
+  zedbox:
+    container_name: zedbox
+    image: "evenet/vswitch"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    dns:
+      - 8.8.8.8
+    # memlock limits were causing "ip vrf exec" to fail.
+    # Rather than to look for a particular value we disable memlock limits altogether.
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - ./scripts:/scripts
+
+  # Open vSwitch
+  # ------------
+  ovs-db:
+    container_name: ovs-db
+    image: "evenet/ovs"
+    depends_on:
+      - zedbox
+    privileged: true
+    pid: "host"
+    network_mode: "service:zedbox"
+    volumes:
+      - ovs-run-volume:/var/run/openvswitch/
+      - ovs-log-volume:/var/log/openvswitch/
+    command: /bin/start-ovs ovsdb-server
+
+  ovs-vswitch:
+    container_name: ovs-vswitch
+    image: "evenet/ovs"
+    depends_on:
+      - zedbox
+    privileged: true
+    pid: "host"
+    network_mode: "service:zedbox"
+    volumes:
+      - ovs-run-volume:/var/run/openvswitch/
+      - ovs-log-volume:/var/log/openvswitch/
+      - /lib/modules:/lib/modules
+    command: bash -c "sleep 5 && /bin/start-ovs ovs-vswitchd"
+
+  # Applications
+  # ------------
+  app1:
+    container_name: app1
+    image: "evenet/app"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    volumes:
+      - ./scripts:/scripts
+    command: /scripts/http.sh app1 80
+
+  app2:
+    container_name: app2
+    image: "evenet/app"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    volumes:
+      - ./scripts:/scripts
+    command: /scripts/http.sh app2 80
+
+  app3:
+    container_name: app3
+    image: "evenet/app"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    volumes:
+      - ./scripts:/scripts
+    environment:
+      QEMU_TAP: "nbu1x3"
+
+  app4:
+    container_name: app4
+    image: "evenet/app"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    volumes:
+      - ./scripts:/scripts
+
+  app5:
+    container_name: app5
+    image: "evenet/app"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    volumes:
+      - ./scripts:/scripts
+
+  app6:
+    container_name: app6
+    image: "evenet/app"
+    privileged: true
+    network_mode: "none"
+    pid: "host"
+    volumes:
+      - ./scripts:/scripts

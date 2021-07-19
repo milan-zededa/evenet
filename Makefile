@@ -2,6 +2,7 @@
 images:
 	cd images/vswitch/ && docker build -t evenet/vswitch .
 	cd images/app/ && docker build -t evenet/app .
+	cd images/ovs/ && docker build -t evenet/ovs .
 
 .PHONY: start-multi-ns
 start-multi-ns: images stop-multi-ns
@@ -20,3 +21,11 @@ start-multi-vrf: images stop-multi-vrf
 .PHONY: stop-multi-vrf
 stop-multi-vrf:
 	docker-compose -f proposal/multi-vrf/docker-compose.yaml down
+
+.PHONY: start-ovs
+start-ovs: images stop-ovs
+	docker-compose -f proposal/ovs/docker-compose.yaml up -d
+
+.PHONY: stop-ovs
+stop-ovs:
+	docker-compose -f proposal/ovs/docker-compose.yaml down -v
